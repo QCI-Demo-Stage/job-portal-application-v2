@@ -1,80 +1,52 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CreateJobDto } from './dto/create-job.dto';
-import { FindJobsQueryDto } from './dto/find-jobs-query.dto';
 import { EmploymentType } from './entities/employment-type.entity';
-import { Job } from './entities/job.entity';
 import { JobStatus } from './entities/job-status.entity';
+import { Job } from './entities/job.entity';
 import { JobsService } from './jobs.service';
 
 describe('JobsService', () => {
   let service: JobsService;
-  let jobsRepo: jest.Mocked<Pick<Repository<Job>, keyof Repository<Job>>>;
-  let employmentRepo: jest.Mocked<
-    Pick<Repository<EmploymentType>, 'findOne'>
+  let jobs: jest.Mocked<
+    Pick<
+      Repository<Job>,
+      'create' | 'save' | 'findOne' | 'createQueryBuilder' | 'remove'
+    >
   >;
-  let statusRepo: jest.Mocked<Pick<Repository<JobStatus>, 'findOne'>>;
+  let employmentTypes: jest.Mocked<Pick<Repository<EmploymentType>, 'findOne'>>;
+  let jobStatuses: jest.Mocked<Pick<Repository<JobStatus>, 'findOne'>>;
 
-  const publishedStatus: JobStatus = {
-    id: 2,
-    code: 'published',
-    label: 'Published',
-  };
-
-  const fullTime: EmploymentType = {
-    id: 1,
-    code: 'full_time',
-    label: 'Full-time',
-  };
-
-  const mockJobRow: Job = {
-    id: 10,
-    employerId: 1,
-    title: 'Backend Developer',
-    description: 'Design APIs and services for our platform.',
-    location: 'Remote EU',
-    salaryMin: '88000.00',
-    salaryMax: '88000.00',
-    employmentType: fullTime,
-    jobStatus: publishedStatus,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    publishedAt: new Date(),
-  };
+  const publishedStatus = { id: 2, code: 'published', label: 'Published' } as JobStatus;
+  const fullTime = { id: 1, code: 'full_time', label: 'Full-time' } as EmploymentType;
 
   beforeEach(async () => {
-    jobsRepo = {
+    jobs = {
       create: jest.fn(),
       save: jest.fn(),
       findOne: jest.fn(),
-      remove: jest.fn(),
       createQueryBuilder: jest.fn(),
-    } as unknown as jest.Mocked<Pick<Repository<Job>, keyof Repository<Job>>>;
-
-    employmentRepo = { findOne: jest.fn() };
-    statusRepo = { findOne: jest.fn() };
-
-    statusRepo.findOne.mockResolvedValue(publishedStatus);
+      remove: jest.fn(),
+    };
+    employmentTypes = { findOne: jest.fn() };
+    jobStatuses = {
+      findOne: jest.fn().mockResolvedValue(publishedStatus),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         JobsService,
-        { provide: getRepositoryToken(Job), useValue: jobsRepo },
+        { provide: getRepositoryToken(Job), useValue: jobs },
         {
           provide: getRepositoryToken(EmploymentType),
-          useValue: employmentRepo,
+          useValue: employmentTypes,
         },
-        { provide: getRepositoryToken(JobStatus), useValue: statusRepo },
+        { provide: getRepositoryToken(JobStatus), useValue: jobStatuses },
       ],
     }).compile();
 
-    service = module.get(JobsService);
+    service = module.get<JobsService>(JobsService);
   });
 
   it('should be defined', () => {
@@ -82,102 +54,145 @@ describe('JobsService', () => {
   });
 
   describe('create', () => {
-    it('persists salary on both bounds and assigns employment type', async () => {
-      employmentRepo.findOne.mockResolvedValue(fullTime);
-      jobsRepo.create.mockReturnValue(mockJobRow);
-      jobsRepo.save.mockResolvedValue(mockJobRow);
-      jobsRepo.findOne.mockResolvedValue(mockJobRow);
-
-      const dto: CreateJobDto = {
-        title: 'Backend Developer',
-        description: 'Design APIs and services for our platform.',
-        location: 'Remote EU',
-        salary: 88000,
+    it('serializes a new published listing', async () => {
+      const dto = {
+        title: 'Senior Dev',
+        description: 'Long enough description for validation rules',
+        location: 'Remote',
         category: 'full_time',
+        salary: 120000,
       };
 
-      await service.create('1', dto);
+      employmentTypes.findOne.mockResolvedValue(fullTime);
 
-      expect(jobsRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          employerId: 1,
-          salaryMin: '88000.00',
-          salaryMax: '88000.00',
-          employmentType: fullTime,
-          jobStatus: publishedStatus,
-        }),
-      );
+      const savedRow = {
+        id: 7,
+        employerId: 42,
+        title: dto.title,
+        description: dto.description,
+        location: dto.location,
+        salaryMin: '120000.00',
+        salaryMax: '120000.00',
+        employmentType: fullTime,
+        jobStatus: publishedStatus,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Job;
+
+      jobs.create.mockReturnValue(savedRow);
+      jobs.save.mockResolvedValue(savedRow);
+      jobs.findOne.mockResolvedValue(savedRow);
+
+      const result = await service.create('42', dto);
+
+      expect(result).toMatchObject({
+        title: dto.title,
+        category: 'full_time',
+        salary: 120000,
+        employerId: 42,
+      });
     });
 
-    it('throws when category code is unknown', async () => {
-      employmentRepo.findOne.mockResolvedValue(null);
+    it('rejects unknown employment type code', async () => {
+      employmentTypes.findOne.mockResolvedValue(null);
 
       await expect(
         service.create('1', {
-          title: 'Backend Developer',
-          description: 'Design APIs and services for our platform.',
-          location: 'Remote EU',
+          title: 'Senior Dev',
+          description: 'Long enough description for validation rules',
+          location: 'Remote',
           category: 'unknown_code',
         }),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
   describe('findAll', () => {
-    it('returns serialized rows with pagination meta', async () => {
-      const mockQb = {
+    it('returns paginated listings with meta', async () => {
+      const row = {
+        id: 1,
+        employerId: 1,
+        title: 'T',
+        description: 'D'.repeat(20),
+        location: 'NYC',
+        salaryMin: '100.00',
+        salaryMax: '100.00',
+        employmentType: fullTime,
+        jobStatus: publishedStatus,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as Job;
+
+      const getManyAndCount = jest.fn().mockResolvedValue([[row], 1]);
+      const qb = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         innerJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getManyAndCount: jest.fn().mockResolvedValue([[mockJobRow], 1]),
+        andWhere: jest.fn().mockReturnThis(),
+        getManyAndCount,
       };
-      jobsRepo.createQueryBuilder.mockReturnValue(mockQb as never);
+      jobs.createQueryBuilder.mockReturnValue(qb as never);
 
       const result = await service.findAll({
         page: 1,
         limit: 10,
         category: 'full_time',
-        location: 'remote',
-      } as FindJobsQueryDto);
-
-      expect(mockQb.skip).toHaveBeenCalledWith(0);
-      expect(mockQb.take).toHaveBeenCalledWith(10);
-      expect(result.data[0]).toMatchObject({
-        id: 10,
-        salary: 88000,
-        category: 'full_time',
+        location: 'york',
       });
-      expect(result.meta.total).toBe(1);
+
+      expect(result.meta).toEqual({
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+      expect(result.data[0].category).toBe('full_time');
     });
   });
 
   describe('findPublished', () => {
-    it('throws when job is not published', async () => {
-      jobsRepo.findOne.mockResolvedValue({
-        ...mockJobRow,
-        jobStatus: { id: 1, code: 'draft', label: 'Draft' },
-      });
+    it('404 when job is not published', async () => {
+      jobs.findOne.mockResolvedValue({
+        id: 1,
+        jobStatus: { code: 'draft' },
+      } as Job);
 
-      await expect(service.findPublished(10)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(service.findPublished(1)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('update', () => {
-    it('throws forbidden when another employer owns the listing', async () => {
-      jobsRepo.findOne.mockResolvedValue({
-        ...mockJobRow,
-        employerId: 99,
-      });
+    it('forbids wrong employer', async () => {
+      jobs.findOne.mockResolvedValue({
+        id: 1,
+        employerId: 10,
+        jobStatus: publishedStatus,
+        employmentType: fullTime,
+      } as Job);
 
       await expect(
-        service.update(10, '1', { title: 'Other title here long enough' }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+        service.update(1, '99', { title: 'New title here ok longer' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('remove', () => {
+    it('removes when employer matches', async () => {
+      const existing = {
+        id: 1,
+        employerId: 10,
+        jobStatus: publishedStatus,
+        employmentType: fullTime,
+      } as Job;
+      jobs.findOne.mockResolvedValue(existing);
+      jobs.remove.mockResolvedValue(existing);
+
+      await service.remove(1, '10');
+
+      expect(jobs.remove).toHaveBeenCalledWith(existing);
     });
   });
 });

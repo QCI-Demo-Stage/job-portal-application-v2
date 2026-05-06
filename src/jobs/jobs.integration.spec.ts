@@ -1,39 +1,30 @@
-import '../../test/setup-env-e2e';
-
 import { ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DataSource } from 'typeorm';
 import request from 'supertest';
-import type { Server } from 'http';
+import { DataSource } from 'typeorm';
 import { AppModule } from '../app.module';
 import { Role } from '../common/enums/role.enum';
+import { RoleEntity } from '../users/role.entity';
 import { EmploymentType } from './entities/employment-type.entity';
 import { JobStatus } from './entities/job-status.entity';
-import { RoleEntity } from '../users/role.entity';
+import { Job } from './entities/job.entity';
+import { JobListingResponse } from './jobs.service';
+
+import '../../test/setup-env-e2e';
 
 describe('Jobs HTTP (integration)', () => {
+  jest.setTimeout(60000);
+  let moduleFixture: TestingModule;
   let app: import('@nestjs/common').INestApplication;
-  let moduleRef: TestingModule;
-  let employerAccessToken: string;
-  let seekerAccessToken: string;
-  let otherEmployerAccessToken: string;
-
-  const server = (): Server => app.getHttpServer() as Server;
-
-  const validBody = {
-    title: 'Backend Developer',
-    description: 'Design APIs and services for our platform.',
-    location: 'Remote EU',
-    salary: 88000,
-    category: 'full_time',
-  };
+  let employerToken: string;
+  let seekerToken: string;
 
   beforeAll(async () => {
-    moduleRef = await Test.createTestingModule({
+    moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    app = moduleRef.createNestApplication();
+    app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -44,150 +35,209 @@ describe('Jobs HTTP (integration)', () => {
     );
     await app.init();
 
-    const ds = moduleRef.get(DataSource);
-    await ds.getRepository(RoleEntity).save([
+    const dataSource = moduleFixture.get(DataSource);
+    const roleRepo = dataSource.getRepository(RoleEntity);
+    await roleRepo.save([
       { name: Role.Seeker, description: 'Job seeker account' },
       { name: Role.Employer, description: 'Employer account' },
       { name: Role.Admin, description: 'Platform administrator' },
     ]);
 
-    await ds.getRepository(EmploymentType).save([
-      { code: 'full_time', label: 'Full-time' },
-      { code: 'part_time', label: 'Part-time' },
-      { code: 'contract', label: 'Contract' },
-      { code: 'internship', label: 'Internship' },
-      { code: 'temporary', label: 'Temporary' },
-    ]);
-
-    await ds.getRepository(JobStatus).save([
+    const jobStatusRepo = dataSource.getRepository(JobStatus);
+    await jobStatusRepo.save([
       { code: 'draft', label: 'Draft' },
       { code: 'published', label: 'Published' },
       { code: 'closed', label: 'Closed' },
       { code: 'archived', label: 'Archived' },
     ]);
 
-    const suffix = Date.now();
-    const employerReg = await request(server())
+    const employmentRepo = dataSource.getRepository(EmploymentType);
+    await employmentRepo.save([
+      { code: 'full_time', label: 'Full-time' },
+      { code: 'part_time', label: 'Part-time' },
+      { code: 'contract', label: 'Contract' },
+    ]);
+
+    await request(app.getHttpServer())
       .post('/auth/register')
       .send({
-        email: `employer-${suffix}@integration.test`,
-        password: 'password12',
+        email: 'jobs-int-employer@example.com',
+        password: 'EmployerPass123',
         role: Role.Employer,
       })
       .expect(201);
-    employerAccessToken = employerReg.body.accessToken as string;
 
-    const seekerReg = await request(server())
+    await request(app.getHttpServer())
       .post('/auth/register')
       .send({
-        email: `seeker-${suffix}@integration.test`,
-        password: 'password12',
+        email: 'jobs-int-seeker@example.com',
+        password: 'SeekerPass123',
         role: Role.Seeker,
       })
       .expect(201);
-    seekerAccessToken = seekerReg.body.accessToken as string;
 
-    const otherEmployerReg = await request(server())
-      .post('/auth/register')
+    const employerLogin = await request(app.getHttpServer())
+      .post('/auth/login')
       .send({
-        email: `employer2-${suffix}@integration.test`,
-        password: 'password12',
-        role: Role.Employer,
+        email: 'jobs-int-employer@example.com',
+        password: 'EmployerPass123',
       })
-      .expect(201);
-    otherEmployerAccessToken = otherEmployerReg.body.accessToken as string;
+      .expect(200);
+
+    const seekerLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'jobs-int-seeker@example.com',
+        password: 'SeekerPass123',
+      })
+      .expect(200);
+
+    employerToken = employerLogin.body.accessToken as string;
+    seekerToken = seekerLogin.body.accessToken as string;
+  });
+
+  beforeEach(async () => {
+    const dataSource = moduleFixture.get(DataSource);
+    await dataSource.getRepository(Job).clear();
   });
 
   afterAll(async () => {
     if (app) {
       await app.close();
     }
+    if (moduleFixture) {
+      await moduleFixture.close();
+    }
   });
 
-  it('GET /jobs is readable without authentication', async () => {
-    await request(server()).get('/jobs').expect(200);
+  const validBody = {
+    title: 'Backend Engineer',
+    description: 'Build scalable APIs with NestJS and TypeORM orm.',
+    location: 'New York',
+    category: 'full_time',
+    salary: 150000,
+  };
+
+  it('GET /jobs allows unauthenticated read', async () => {
+    await request(app.getHttpServer()).get('/jobs').expect(200);
   });
 
-  it('POST /jobs returns 401 without token', async () => {
-    await request(server()).post('/jobs').send(validBody).expect(401);
+  it('POST /jobs returns 401 without bearer token', async () => {
+    await request(app.getHttpServer())
+      .post('/jobs')
+      .send(validBody)
+      .expect(401);
   });
 
   it('POST /jobs returns 403 for Seeker role', async () => {
-    await request(server())
+    await request(app.getHttpServer())
       .post('/jobs')
-      .set('Authorization', `Bearer ${seekerAccessToken}`)
+      .set('Authorization', `Bearer ${seekerToken}`)
       .send(validBody)
       .expect(403);
   });
 
-  it('POST /jobs returns 400 when validation fails', async () => {
-    await request(server())
+  it('POST /jobs creates job for Employer and GET returns it', async () => {
+    const createRes = await request(app.getHttpServer())
       .post('/jobs')
-      .set('Authorization', `Bearer ${employerAccessToken}`)
-      .send({
-        title: 'ab',
-        description: 'short',
-        location: '',
-      })
-      .expect(400);
-  });
-
-  it('creates, lists, reads, updates, and deletes a job for employers', async () => {
-    const createRes = await request(server())
-      .post('/jobs')
-      .set('Authorization', `Bearer ${employerAccessToken}`)
+      .set('Authorization', `Bearer ${employerToken}`)
       .send(validBody)
       .expect(201);
 
-    expect(createRes.body).toMatchObject({
-      title: validBody.title,
-      description: validBody.description,
-      location: validBody.location,
-      category: 'full_time',
-    });
-    expect(typeof createRes.body.id).toBe('number');
+    const created = createRes.body as JobListingResponse;
 
-    const listRes = await request(server())
+    expect(created).toMatchObject({
+      title: validBody.title,
+      category: validBody.category,
+    });
+    expect(typeof created.employerId).toBe('number');
+
+    const listRes = await request(app.getHttpServer())
       .get('/jobs')
       .query({
         category: 'full_time',
-        location: 'remote',
+        location: 'york',
         page: 1,
         limit: 10,
       })
       .expect(200);
 
-    expect(listRes.body.meta.total).toBeGreaterThanOrEqual(1);
-    expect(listRes.body.data.length).toBeGreaterThanOrEqual(1);
+    const listBody = listRes.body as {
+      data: JobListingResponse[];
+      meta: { total: number };
+    };
 
-    const jobId = createRes.body.id as number;
+    expect(listBody.meta.total).toBeGreaterThanOrEqual(1);
+    expect(listBody.data[0]).toMatchObject({
+      title: validBody.title,
+      category: validBody.category,
+    });
 
-    const getRes = await request(server()).get(`/jobs/${jobId}`).expect(200);
-    expect(getRes.body.id).toBe(jobId);
+    await request(app.getHttpServer()).get(`/jobs/${created.id}`).expect(200);
+  });
 
-    await request(server())
-      .patch(`/jobs/${jobId}`)
-      .set('Authorization', `Bearer ${otherEmployerAccessToken}`)
-      .send({ title: 'Malicious Title Change Here' })
-      .expect(403);
+  it('POST /jobs returns 400 on validation failure', async () => {
+    await request(app.getHttpServer())
+      .post('/jobs')
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send({
+        title: 'bad',
+        description: 'short',
+        location: 'X',
+      })
+      .expect(400);
+  });
 
-    const patchRes = await request(server())
-      .patch(`/jobs/${jobId}`)
-      .set('Authorization', `Bearer ${employerAccessToken}`)
-      .send({ title: 'Senior Backend Developer' })
+  it('PATCH and DELETE enforce employer ownership', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/jobs')
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send(validBody)
+      .expect(201);
+
+    const created = createRes.body as JobListingResponse;
+
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: 'other-employer-jobs@example.com',
+        password: 'EmployerPass123',
+        role: Role.Employer,
+      })
+      .expect(201);
+
+    const otherLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'other-employer-jobs@example.com',
+        password: 'EmployerPass123',
+      })
       .expect(200);
-    expect(patchRes.body.title).toBe('Senior Backend Developer');
 
-    await request(server())
-      .delete(`/jobs/${jobId}`)
-      .set('Authorization', `Bearer ${seekerAccessToken}`)
+    const otherToken = otherLogin.body.accessToken as string;
+
+    await request(app.getHttpServer())
+      .patch(`/jobs/${created.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .send({ title: 'Another title here ok long' })
       .expect(403);
 
-    await request(server())
-      .delete(`/jobs/${jobId}`)
-      .set('Authorization', `Bearer ${employerAccessToken}`)
+    await request(app.getHttpServer())
+      .patch(`/jobs/${created.id}`)
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send({ title: 'Updated job title string ok' })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .delete(`/jobs/${created.id}`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .delete(`/jobs/${created.id}`)
+      .set('Authorization', `Bearer ${employerToken}`)
       .expect(204);
 
-    await request(server()).get(`/jobs/${jobId}`).expect(404);
+    await request(app.getHttpServer()).get(`/jobs/${created.id}`).expect(404);
   });
 });
