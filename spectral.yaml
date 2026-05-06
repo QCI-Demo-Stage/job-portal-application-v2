@@ -1,0 +1,13 @@
+extends:
+  - spectral:oas
+
+rules:
+  operation-operationId: error
+  operation-tags: error
+  tag-description: warn
+  info-contact: off
+  info-license: warn
+  oas3-api-servers: error
+  path-params: error
+  array-items: error
+  typed-enum: warn

@@ -1,0 +1,851 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "summary": "Register a new account",
+        "description": "Creates a user with the requested role (`job_seeker` or `employer`), hashes the password, and returns JWT access and refresh tokens alongside basic profile fields.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created and authenticated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed (email format, password length, role, …)."
+          },
+          "409": {
+            "description": "Email address is already registered."
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "summary": "Log in",
+        "description": "Validates credentials for active users and returns access and refresh tokens plus profile fields.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or inactive account."
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "summary": "Refresh tokens",
+        "description": "Exchanges a valid refresh token for a new access/refresh pair without re-entering credentials.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "New tokens issued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthTokensOnlyResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token missing, invalid, or expired."
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/sample/admin-only": {
+      "get": {
+        "operationId": "SampleController_adminOnly",
+        "summary": "Admin-only probe",
+        "description": "Returns `{ \"scope\": \"admin\" }` when the JWT carries the `admin` role.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized admin caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "scope": "admin"
+                  },
+                  "properties": {
+                    "scope": {
+                      "type": "string",
+                      "example": "admin",
+                      "description": "Fixed marker value for this probe endpoint."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the admin role."
+          }
+        },
+        "tags": [
+          "sample"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      }
+    },
+    "/sample/seeker-only": {
+      "get": {
+        "operationId": "SampleController_seekerOnly",
+        "summary": "Job seeker probe",
+        "description": "Returns `{ \"scope\": \"seeker\" }` when the JWT carries the `job_seeker` role.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized job seeker caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "scope": "seeker"
+                  },
+                  "properties": {
+                    "scope": {
+                      "type": "string",
+                      "example": "seeker"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the job_seeker role."
+          }
+        },
+        "tags": [
+          "sample"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      }
+    },
+    "/sample/employer-only": {
+      "get": {
+        "operationId": "SampleController_employerOnly",
+        "summary": "Employer probe",
+        "description": "Returns `{ \"scope\": \"employer\" }` when the JWT carries the `employer` role.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized employer caller.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "scope": "employer"
+                  },
+                  "properties": {
+                    "scope": {
+                      "type": "string",
+                      "example": "employer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Caller lacks the employer role."
+          }
+        },
+        "tags": [
+          "sample"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      }
+    },
+    "/jobs": {
+      "post": {
+        "operationId": "JobsController_create",
+        "summary": "Create a job posting",
+        "description": "Creates a **published** job owned by the authenticated employer (`employer` role required).",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListingResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or unknown employment type code."
+          },
+          "401": {
+            "description": "Missing or invalid access token."
+          },
+          "403": {
+            "description": "Authenticated user does not have the employer role."
+          }
+        },
+        "tags": [
+          "jobs"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "JobsController_findAll",
+        "summary": "List published jobs",
+        "description": "Returns paginated **published** jobs with optional filters on employment type code and location substring.",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Page number (1-based).",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size (maximum 100).",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10,
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Filter by employment type code.",
+            "schema": {
+              "maxLength": 32,
+              "example": "full_time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "location",
+            "required": false,
+            "in": "query",
+            "description": "Case-insensitive partial match on location.",
+            "schema": {
+              "maxLength": 255,
+              "example": "Berlin",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated job listings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedJobsResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/jobs/{id}": {
+      "get": {
+        "operationId": "JobsController_findOne",
+        "summary": "Get published job by id",
+        "description": "Loads a single published job by numeric id. Draft or unpublished jobs return `404`.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Numeric job id.",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListingResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job does not exist or is not published."
+          }
+        },
+        "tags": [
+          "jobs"
+        ]
+      },
+      "patch": {
+        "operationId": "JobsController_update",
+        "summary": "Update a job posting",
+        "description": "Updates fields on a job owned by the authenticated employer. Employers may only mutate their own postings.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Numeric job id.",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateJobDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListingResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or unknown employment type code."
+          },
+          "403": {
+            "description": "Caller is not allowed to modify this job."
+          },
+          "404": {
+            "description": "Job not found or not owned by this employer."
+          }
+        },
+        "tags": [
+          "jobs"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "JobsController_remove",
+        "summary": "Delete a job posting",
+        "description": "Deletes a job owned by the authenticated employer. Employers may only delete their own postings.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Numeric job id.",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Job deleted."
+          },
+          "403": {
+            "description": "Caller is not allowed to delete this job."
+          },
+          "404": {
+            "description": "Job not found or not owned by this employer."
+          }
+        },
+        "tags": [
+          "jobs"
+        ],
+        "security": [
+          {
+            "JWT-auth": []
+          }
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Job Portal API",
+    "description": "REST API for Job Portal V2: JWT access and refresh tokens, role-based access control, and job postings with pagination and filters.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Job Portal Team",
+      "url": "https://github.com/QCI-Demo-Stage/job-portal-application-v2",
+      "email": "support@example.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Registration, login, and token refresh"
+    },
+    {
+      "name": "jobs",
+      "description": "Public job listings and employer job management"
+    },
+    {
+      "name": "sample",
+      "description": "Role-protected sample endpoints for JWT/RBAC checks"
+    }
+  ],
+  "servers": [
+    {
+      "url": "/",
+      "description": "Current server (same origin)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "JWT-auth": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "Paste the access token from login/register (`accessToken` field). Use header `Authorization: Bearer <token>`."
+      }
+    },
+    "schemas": {
+      "Role": {
+        "type": "string",
+        "description": "Primary role for the user. Values match `role.name` in the database (job_seeker, employer, admin).",
+        "enum": [
+          "job_seeker",
+          "employer",
+          "admin"
+        ]
+      },
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "jane@example.com",
+            "description": "Unique email address used for login."
+          },
+          "password": {
+            "type": "string",
+            "example": "Str0ng_Password!",
+            "description": "Plain-text password (minimum 8 characters).",
+            "minLength": 8
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Jane",
+            "description": "Given name (optional; defaults if omitted).",
+            "maxLength": 100
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Doe",
+            "description": "Family name (optional; defaults if omitted).",
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "role"
+        ]
+      },
+      "AuthUserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1,
+            "description": "Numeric user id from the database."
+          },
+          "email": {
+            "type": "string",
+            "example": "jane@example.com",
+            "description": "Email address used at registration."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role"
+        ]
+      },
+      "AuthSessionResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AuthUserResponseDto"
+          },
+          "accessToken": {
+            "type": "string",
+            "description": "Short-lived JWT access token. Send as `Authorization: Bearer <accessToken>`.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwIjoiYWNjZXNzIn0.example"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Long-lived refresh token for `POST /auth/refresh` to obtain new tokens.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwIjoicmVmcmVzaCJ9.example"
+          }
+        },
+        "required": [
+          "user",
+          "accessToken",
+          "refreshToken"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "jane@example.com",
+            "description": "Registered email address."
+          },
+          "password": {
+            "type": "string",
+            "example": "Str0ng_Password!",
+            "description": "Account password.",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token previously returned by login, register, or refresh.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwIjoicmVmcmVzaCJ9.example"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "AuthTokensOnlyResponseDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "New JWT access token.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwIjoiYWNjZXNzIn0.example"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "New refresh token.",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwidHlwIjoicmVmcmVzaCJ9.example"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken"
+        ]
+      },
+      "CreateJobDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Senior Backend Engineer",
+            "description": "Job title shown in listings.",
+            "maxLength": 255,
+            "minLength": 5
+          },
+          "description": {
+            "type": "string",
+            "example": "We use NestJS and PostgreSQL. You will design REST APIs, collaborate with frontend engineers, and participate in code reviews.",
+            "description": "Full job description and requirements.",
+            "minLength": 20
+          },
+          "location": {
+            "type": "string",
+            "example": "Berlin, DE (hybrid)",
+            "description": "Primary location or remote policy.",
+            "maxLength": 255
+          },
+          "salary": {
+            "type": "number",
+            "example": 95000,
+            "description": "Optional gross salary when minimum and maximum are equal (stored internally as a single amount)."
+          },
+          "category": {
+            "type": "string",
+            "example": "full_time",
+            "description": "Employment type code matching `employment_type.code` (for example `full_time`, `part_time`).",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "location"
+        ]
+      },
+      "JobListingResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 42,
+            "description": "Job posting id."
+          },
+          "title": {
+            "type": "string",
+            "example": "Senior Backend Engineer",
+            "description": "Job title."
+          },
+          "description": {
+            "type": "string",
+            "description": "Full description text.",
+            "example": "We use NestJS and PostgreSQL. Minimum five years backend experience."
+          },
+          "location": {
+            "type": "string",
+            "example": "Berlin, DE (hybrid)",
+            "description": "Location or remote policy."
+          },
+          "salary": {
+            "type": "number",
+            "description": "Representative salary when min/max match; otherwise null.",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "description": "Employment type code from `employment_type.code`.",
+            "nullable": true
+          },
+          "employerId": {
+            "type": "number",
+            "example": 7,
+            "description": "Employer user id owning this posting."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation time (ISO 8601)."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update time (ISO 8601)."
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "location",
+          "employerId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaginationMetaDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "example": 120,
+            "description": "Total rows matching filters."
+          },
+          "page": {
+            "type": "number",
+            "example": 1,
+            "description": "Current page number."
+          },
+          "limit": {
+            "type": "number",
+            "example": 10,
+            "description": "Page size."
+          },
+          "totalPages": {
+            "type": "number",
+            "example": 12,
+            "description": "Total pages given current limit."
+          }
+        },
+        "required": [
+          "total",
+          "page",
+          "limit",
+          "totalPages"
+        ]
+      },
+      "PaginatedJobsResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobListingResponseDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMetaDto"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ]
+      },
+      "UpdateJobDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "example": "Senior Backend Engineer",
+            "description": "Job title shown in listings.",
+            "maxLength": 255,
+            "minLength": 5
+          },
+          "description": {
+            "type": "string",
+            "example": "We use NestJS and PostgreSQL. You will design REST APIs, collaborate with frontend engineers, and participate in code reviews.",
+            "description": "Full job description and requirements.",
+            "minLength": 20
+          },
+          "location": {
+            "type": "string",
+            "example": "Berlin, DE (hybrid)",
+            "description": "Primary location or remote policy.",
+            "maxLength": 255
+          },
+          "salary": {
+            "type": "number",
+            "example": 95000,
+            "description": "Optional gross salary when minimum and maximum are equal (stored internally as a single amount)."
+          },
+          "category": {
+            "type": "string",
+            "example": "full_time",
+            "description": "Employment type code matching `employment_type.code` (for example `full_time`, `part_time`).",
+            "maxLength": 32
+          }
+        }
+      }
+    }
+  }
+}
