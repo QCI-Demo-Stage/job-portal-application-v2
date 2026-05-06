@@ -1,0 +1,16 @@
+node_modules
+dist
+build
+.git
+.gitignore
+.env
+.env.*
+*.md
+docker-compose*.yml
+frontend
+test
+coverage
+*.log
+openapi.json
+spectral.yaml
+docs

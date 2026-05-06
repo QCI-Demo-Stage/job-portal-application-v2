@@ -1,15 +1,51 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: job-portal-postgres
+  frontend:
+    build: ./frontend
+    ports:
+      - '3000:80'
+    networks:
+      - jobportal_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - '3001:3000'
+    environment:
+      DB_HOST: db
+      DB_PORT: '5432'
+      DB_USERNAME: jobportal
+      DB_PASSWORD: jobportal
+      DB_NAME: jobportal
+      NODE_ENV: production
+      JWT_SECRET: dev-docker-jwt-access-secret-min-32-chars-long!!
+      JWT_REFRESH_SECRET: dev-docker-jwt-refresh-secret-min-32-chars!!
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - jobportal_net
+
+  db:
+    image: postgres:15
     environment:
       POSTGRES_USER: jobportal
       POSTGRES_PASSWORD: jobportal
       POSTGRES_DB: jobportal
-    ports:
-      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jobportal -d jobportal"]
+      test: ['CMD-SHELL', 'pg_isready -U jobportal -d jobportal']
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - jobportal_net
+
+networks:
+  jobportal_net:
+    name: jobportal_net
+
+volumes:
+  db-data:
