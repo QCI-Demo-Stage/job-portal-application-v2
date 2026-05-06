@@ -6,6 +6,10 @@ vendor/
 .env
 .env.local
 
+# Local SQLite (default dev database)
+*.sqlite
+*.sqlite-journal
+
 # Build / IDE
 dist/
 build/
