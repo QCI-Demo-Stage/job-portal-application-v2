@@ -5,12 +5,23 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { EmploymentType } from './jobs/entities/employment-type.entity';
+import { JobStatus } from './jobs/entities/job-status.entity';
+import { Job } from './jobs/entities/job.entity';
+import { JobsModule } from './jobs/jobs.module';
 import { SampleModule } from './sample/sample.module';
 import { RoleEntity } from './users/role.entity';
 import { UserRole } from './users/user-role.entity';
 import { User } from './users/user.entity';
 
-const entities = [User, RoleEntity, UserRole];
+const entities = [
+  User,
+  RoleEntity,
+  UserRole,
+  Job,
+  EmploymentType,
+  JobStatus,
+];
 
 @Module({
   imports: [
@@ -55,6 +66,7 @@ const entities = [User, RoleEntity, UserRole];
     }),
     AuthModule,
     SampleModule,
+    JobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
