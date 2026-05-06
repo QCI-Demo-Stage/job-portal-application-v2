@@ -78,6 +78,17 @@ describe('Auth & RBAC (e2e)', () => {
       .expect(409);
   });
 
+  it('rejects registration with admin role', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: 'cannot-be-admin@example.com',
+        password: 'Password123',
+        role: Role.Admin,
+      })
+      .expect(400);
+  });
+
   it('logs in with valid credentials', async () => {
     const res = await request(app.getHttpServer())
       .post('/auth/login')
@@ -154,6 +165,47 @@ describe('Auth & RBAC (e2e)', () => {
 
     await request(app.getHttpServer())
       .get('/sample/admin-only')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(403);
+  });
+
+  it('allows employer to access employer-only route', async () => {
+    await request(app.getHttpServer())
+      .post('/auth/register')
+      .send({
+        email: 'employer-e2e@example.com',
+        password: 'EmployerPass123',
+        role: Role.Employer,
+      })
+      .expect(201);
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'employer-e2e@example.com',
+        password: 'EmployerPass123',
+      })
+      .expect(200);
+
+    const res = await request(app.getHttpServer())
+      .get('/sample/employer-only')
+      .set('Authorization', `Bearer ${login.body.accessToken}`)
+      .expect(200);
+
+    expect(res.body.scope).toBe('employer');
+  });
+
+  it('returns 403 when seeker hits employer-only route', async () => {
+    const login = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({
+        email: 'seeker-e2e@example.com',
+        password: 'SeekerPass123',
+      })
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get('/sample/employer-only')
       .set('Authorization', `Bearer ${login.body.accessToken}`)
       .expect(403);
   });

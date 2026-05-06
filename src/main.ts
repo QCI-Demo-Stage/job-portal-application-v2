@@ -1,6 +1,15 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { webcrypto } from 'node:crypto';
 import { AppModule } from './app.module';
+
+if (typeof globalThis.crypto === 'undefined') {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: webcrypto,
+    writable: true,
+    configurable: true,
+  });
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

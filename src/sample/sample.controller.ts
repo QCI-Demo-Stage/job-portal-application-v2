@@ -15,4 +15,10 @@ export class SampleController {
   seekerOnly() {
     return { scope: 'seeker' };
   }
+
+  @Get('employer-only')
+  @Roles(Role.Employer)
+  employerOnly() {
+    return { scope: 'employer' };
+  }
 }
