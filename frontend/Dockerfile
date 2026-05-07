@@ -6,6 +6,8 @@ COPY package*.json ./
 RUN npm ci && npm cache clean --force
 COPY public ./public
 COPY src ./src
+COPY tsconfig.json ./
+COPY craco.config.ts ./
 RUN npm run build && npm cache clean --force
 
 FROM nginx:alpine
