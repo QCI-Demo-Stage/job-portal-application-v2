@@ -1,9 +1,9 @@
 describe('Employer job posting flow', () => {
-  const apiUrl = Cypress.env('apiUrl');
+  const apiUrl = Cypress.env('apiUrl') as string;
 
   /** Ensures the fixture employer exists (idempotent for CI and local reruns). */
   before(() => {
-    cy.fixture('employerUser').then((user) => {
+    cy.fixture('employerUser').then((user: { email: string; password: string }) => {
       cy.request({
         method: 'POST',
         url: `${apiUrl}/auth/register`,
@@ -29,7 +29,7 @@ describe('Employer job posting flow', () => {
       'End-to-end Cypress description for employer job posting flow validation.';
     const location = 'Remote';
 
-    cy.fixture('employerUser').then((user) => {
+    cy.fixture('employerUser').then((user: { email: string; password: string }) => {
       cy.intercept('POST', '**/jobs').as('createJob');
 
       cy.visit('/login');
@@ -53,7 +53,7 @@ describe('Employer job posting flow', () => {
 
       cy.visit('/jobs');
       cy.get('[data-testid="job-search"]').clear().type(uniqueTitle);
-      cy.contains('[data-testid="job-list-item"]', uniqueTitle).should('be.visible');
+      cy.get('[data-testid="job-listing-title"]').should('contain.text', uniqueTitle);
     });
   });
 });
