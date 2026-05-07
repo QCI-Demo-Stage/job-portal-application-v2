@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type { JobListing, PaginatedJobsBody } from '../types/api';
 
 export default function JobsListPage() {
-  const [jobs, setJobs] = useState([]);
+  const [jobs, setJobs] = useState<JobListing[]>([]);
   const [search, setSearch] = useState('');
   const [loadError, setLoadError] = useState('');
 
@@ -11,7 +12,7 @@ export default function JobsListPage() {
     (async () => {
       try {
         const res = await fetch('/jobs?limit=100');
-        const data = await res.json().catch(() => ({}));
+        const data = (await res.json().catch(() => ({}))) as PaginatedJobsBody;
         if (!res.ok) {
           if (!cancelled) setLoadError('Could not load jobs');
           return;
@@ -54,10 +55,10 @@ export default function JobsListPage() {
         {filtered.map((job) => (
           <li
             key={job.id}
-            data-testid="job-list-item"
-            style={{ borderBottom: '1px solid #ddd', padding: '0.75rem 0' }}
+            data-testid="job-listing-row"
+            style={{ padding: '0.75rem 0', borderBottom: '1px solid #eee' }}
           >
-            <strong>{job.title}</strong>
+            <strong data-testid="job-listing-title">{job.title}</strong>
             <div style={{ color: '#555', fontSize: '0.9rem' }}>{job.location}</div>
           </li>
         ))}

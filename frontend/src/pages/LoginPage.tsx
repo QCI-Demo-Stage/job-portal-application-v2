@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { ApiErrorBody, AuthSessionBody } from '../types/api';
+import { formatApiMessage } from '../utils/formatApiMessage';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -7,7 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     try {
@@ -16,9 +18,9 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as AuthSessionBody & ApiErrorBody;
       if (!res.ok) {
-        setError(data.message || 'Login failed');
+        setError(formatApiMessage(data.message, 'Login failed'));
         return;
       }
       if (data.accessToken) {

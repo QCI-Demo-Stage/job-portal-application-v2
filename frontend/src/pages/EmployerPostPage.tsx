@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { FormEvent, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { ApiErrorBody } from '../types/api';
+import { formatApiMessage } from '../utils/formatApiMessage';
 
 export default function EmployerPostPage() {
   const navigate = useNavigate();
@@ -15,16 +17,18 @@ export default function EmployerPostPage() {
     }
   }, [navigate]);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     const token = localStorage.getItem('accessToken');
-    const body = {
+    const body: Record<string, unknown> = {
       title,
       description,
       location,
-      category: category || undefined,
     };
+    if (category) {
+      body.category = category;
+    }
     try {
       const res = await fetch('/jobs', {
         method: 'POST',
@@ -34,12 +38,9 @@ export default function EmployerPostPage() {
         },
         body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as ApiErrorBody;
       if (!res.ok) {
-        const msg = Array.isArray(data.message)
-          ? data.message.join(', ')
-          : data.message || 'Could not create job';
-        setError(msg);
+        setError(formatApiMessage(data.message, 'Could not create job'));
         return;
       }
       navigate('/jobs');
@@ -63,18 +64,19 @@ export default function EmployerPostPage() {
             minLength={5}
           />
         </label>
+
         <label style={{ display: 'block', marginBottom: 8 }}>
           Description
           <textarea
             data-testid="job-description"
             value={description}
             onChange={(ev) => setDescription(ev.target.value)}
-            rows={5}
-            style={{ display: 'block', width: '100%', marginTop: 4 }}
+            style={{ display: 'block', width: '100%', marginTop: 4, minHeight: 120 }}
             required
             minLength={20}
           />
         </label>
+
         <label style={{ display: 'block', marginBottom: 8 }}>
           Location
           <input
@@ -85,6 +87,7 @@ export default function EmployerPostPage() {
             required
           />
         </label>
+
         <label style={{ display: 'block', marginBottom: 8 }}>
           Employment type
           <select
@@ -93,16 +96,13 @@ export default function EmployerPostPage() {
             onChange={(ev) => setCategory(ev.target.value)}
             style={{ display: 'block', width: '100%', marginTop: 4 }}
           >
-            <option value="full_time">Full-time</option>
-            <option value="part_time">Part-time</option>
-            <option value="contract">Contract</option>
+            <option value="full_time">Full time</option>
+            <option value="part_time">Part time</option>
           </select>
         </label>
-        {error ? (
-          <p data-testid="job-post-error" style={{ color: 'crimson' }}>
-            {error}
-          </p>
-        ) : null}
+
+        {error ? <p style={{ color: 'crimson' }}>{error}</p> : null}
+
         <button data-testid="job-submit" type="submit">
           Publish job
         </button>
