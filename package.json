@@ -4,6 +4,7 @@
   "private": true,
   "description": "Job Portal V2 — NestJS API, database schema and TypeORM migrations",
   "scripts": {
+    "lint": "tsc --noEmit -p tsconfig.json",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
