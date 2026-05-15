@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function App() {
+export default function App(): JSX.Element {
   return (
     <main style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem' }}>
       <h1>Job Portal</h1>
