@@ -1,8 +1,14 @@
 name: CI App Integration Test
 
-# Allows you to trigger this manually via the API or GitHub UI
 on: 
   workflow_dispatch:
+
+# This tells the GitHub Runner to bypass the default read-only UI setting
+permissions:
+  contents: write
+  actions: write
+  checks: write
+  statuses: write
 
 jobs:
   diagnostic_build:
