@@ -1,0 +1,15 @@
+name: CI App Integration Test
+
+# Allows you to trigger this manually via the API or GitHub UI
+on: 
+  workflow_dispatch:
+
+jobs:
+  diagnostic_build:
+    name: Execute App Test Job
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hello World Step
+        run: |
+          echo "GitHub Actions is active."
+          echo "Testing console log streaming retrieval."
