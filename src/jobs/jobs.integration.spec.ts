@@ -12,6 +12,7 @@ import { JobListingResponse } from './jobs.service';
 
 import '../../test/setup-env-e2e';
 
+/** AppModule uses pg-mem-backed PostgreSQL when `NODE_ENV` is `test` (see `app.module.ts`). */
 describe('Jobs HTTP (integration)', () => {
   jest.setTimeout(60000);
   let moduleFixture: TestingModule;
@@ -134,6 +135,54 @@ describe('Jobs HTTP (integration)', () => {
       .post('/jobs')
       .set('Authorization', `Bearer ${seekerToken}`)
       .send(validBody)
+      .expect(403);
+  });
+
+  it('POST /jobs as employer returns 201', async () => {
+    await request(app.getHttpServer())
+      .post('/jobs')
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send(validBody)
+      .expect(201);
+  });
+
+  it('GET /jobs as job seeker returns paginated results', async () => {
+    await request(app.getHttpServer())
+      .post('/jobs')
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send(validBody)
+      .expect(201);
+
+    const listRes = await request(app.getHttpServer())
+      .get('/jobs')
+      .set('Authorization', `Bearer ${seekerToken}`)
+      .query({ page: 1, limit: 5 })
+      .expect(200);
+
+    const listBody = listRes.body as {
+      data: JobListingResponse[];
+      meta: { total: number; page: number; limit: number; totalPages: number };
+    };
+
+    expect(listBody.meta.page).toBe(1);
+    expect(listBody.meta.limit).toBe(5);
+    expect(listBody.meta.total).toBeGreaterThanOrEqual(1);
+    expect(listBody.meta.totalPages).toBeGreaterThanOrEqual(1);
+    expect(Array.isArray(listBody.data)).toBe(true);
+  });
+
+  it('DELETE /jobs/:id as job seeker returns 403', async () => {
+    const createRes = await request(app.getHttpServer())
+      .post('/jobs')
+      .set('Authorization', `Bearer ${employerToken}`)
+      .send(validBody)
+      .expect(201);
+
+    const created = createRes.body as JobListingResponse;
+
+    await request(app.getHttpServer())
+      .delete(`/jobs/${created.id}`)
+      .set('Authorization', `Bearer ${seekerToken}`)
       .expect(403);
   });
 

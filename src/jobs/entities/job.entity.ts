@@ -59,6 +59,6 @@ export class Job {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 
-  @Column({ name: 'published_at', type: 'datetime', nullable: true })
+  @Column({ name: 'published_at', type: 'timestamp', nullable: true })
   publishedAt!: Date | null;
 }
